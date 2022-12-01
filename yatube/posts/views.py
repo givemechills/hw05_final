@@ -33,17 +33,16 @@ def group_posts(request, slug):
 def profile(request, username):
     author = get_object_or_404(User, username=username)
     posts = author.posts.all()
-    paginator = Paginator(posts, POSTS_PER_PAGE)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
+    post_count = posts.count()
     following = request.user.is_authenticated and request.user.follower.filter(
         author=author)
     context = {
         'author': author,
         'following': following,
         'posts': posts,
-        'page_obj': page_obj
+        'posts_count': post_count
     }
+    context.update(get_page_context(author.posts.all(), request))
     return render(request, 'posts/profile.html', context)
 
 
@@ -116,7 +115,10 @@ def add_comment(request, post_id):
 
 @login_required
 def follow_index(request):
-    post_list = Post.objects.filter(author__following__user=request.user).all()
+    follower = Follow.objects.filter(user=request.user).values_list(
+        'author_id', flat=True
+    )
+    post_list = Post.objects.filter(author_id__in=follower)
     paginator = Paginator(post_list, POSTS_PER_PAGE)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
@@ -131,7 +133,7 @@ def profile_follow(request, username):
     author = get_object_or_404(User, username=username)
     if author != request.user:
         Follow.objects.get_or_create(user=request.user, author=author)
-    return redirect('posts:profile', author)
+    return redirect('posts:profile', username=username)
 
 
 @login_required
