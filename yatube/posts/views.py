@@ -5,7 +5,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 
 from .forms import CommentForm, PostForm
 from .models import Follow, Group, Post, User
-from .utils import get_page_context
+
 
 User = get_user_model()
 POSTS_PER_PAGE = 10
@@ -18,6 +18,7 @@ def index(request):
     page_obj = paginator.get_page(page_number)
     context = {
         'page_obj': page_obj,
+        'title': 'Последние обновления',
     }
     return render(request, 'posts/index.html', context)
 
@@ -122,10 +123,12 @@ def follow_index(request):
         'author_id', flat=True
     )
     post_list = Post.objects.filter(author_id__in=follower)
+    paginator = Paginator(post_list, POSTS_PER_PAGE)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
     context = {
-        'post_list': post_list,
+        'page_obj': page_obj,
     }
-    context.update(get_page_context(post_list, request))
     return render(request, 'posts/follow.html', context)
 
 
