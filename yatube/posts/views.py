@@ -46,7 +46,6 @@ def profile(request, username):
     context = {
         'author': author,
         'following': following,
-        'posts': posts,
         'page_obj': page_obj,
     }
     return render(request, 'posts/profile.html', context)
@@ -58,7 +57,6 @@ def post_detail(request, post_id):
     comments = post.comments.all()
     post_count = post.author.posts.count()
     context = {
-        'post': post,
         'form': form,
         'comments': comments,
         'post_count': post_count
