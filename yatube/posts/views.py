@@ -27,17 +27,17 @@ def group_posts(request, slug):
 
 
 def profile(request, username):
-    author = get_object_or_404(User, username=username)
-    posts = author.posts.all()
+    author_id = User.objects.get(username=username)
+    posts = author_id.posts.all()
     post_count = posts.count()
-    following = request.user.is_authenticated and author.following.exists()
+    following = request.user.is_authenticated and author_id.following.exists()
     context = {
-        'author': author,
+        'author': author_id,
         'following': following,
         'posts': posts,
         'posts_count': post_count
     }
-    context.update(get_page_context(author.posts.all(), request))
+    context.update(get_page_context(author_id.posts.all(), request))
     return render(request, 'posts/profile.html', context)
 
 
@@ -83,10 +83,10 @@ def post_edit(request, post_id):
     )
     is_edit = True
     if request.user.id != post.author.id:
-        return redirect('posts:post_detail', post_id)
+        return redirect('posts:post_detail', post_id=post_id)
     if form.is_valid():
         form.save()
-        return redirect('posts:post_detail', post_id)
+        return redirect('posts:post_detail', post_id=post_id)
     context = {
         'form': form,
         'post': post,
