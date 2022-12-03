@@ -3,6 +3,7 @@ import tempfile
 
 from django import forms
 from django.conf import settings
+from django.core.cache import cache
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client, TestCase, override_settings
 from django.urls import reverse
@@ -153,6 +154,7 @@ class PostPagesTests(TestCase):
     def test_comment_has_correct_context(self):
         """Kомментарий появляется на странице поста."""
         form_data = {'text': 'Новый комментарий'}
+        comment_count = Comment.objects.count()
         response = self.authorized_client.post(
             reverse('posts:add_comment', kwargs={'post_id': self.post.id}),
             data=form_data,
@@ -164,40 +166,80 @@ class PostPagesTests(TestCase):
                 kwargs={'post_id': self.post.id}
             )
         )
-        self.assertTrue(
-            Comment.objects.filter(text='Новый комментарий').exists()
-        )
+        self.assertTrue(self.post.text, form_data['text'])
+        self.assertEqual(Comment.objects.count(), comment_count + 1)
 
     def test_check_cache(self):
         """Тестирование кеша."""
         response = self.authorized_client.get(reverse('posts:index'))
         post_1 = response.content
-        Post.objects.get(id=1).delete()
+        post_delete = Post.objects.get(id=1)
         response2 = self.authorized_client.get(reverse('posts:index'))
+        post_delete.delete()
         post_2 = response2.content
         self.assertEqual(post_1, post_2, 'Ошибка')
+        cache.clear()
+        post_cache_clear = self.authorized_client.get(reverse('posts:index'))
+        self.assertNotEqual(post_1, post_cache_clear, 'Ошибка')
+
+
+class FollowViewsTests(TestCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.following = User.objects.create_user(username='following')
+        cls.follower = User.objects.create_user(username='follower')
+        cls.post = Post.objects.create(
+            author=cls.following,
+            text='Тестовый текст',
+        )
+
+    def setUp(self):
+        cache.clear()
+        self.authorized_client = Client()
+        self.authorized_client.force_login(self.follower)
+        self.follower_client = Client()
+        self.follower_client.force_login(self.following)
 
     def test_follow_author_page(self):
         """Тестирование подписки на автора и появление поста."""
-        response = self.authorized_client.get(reverse('posts:follow_index'))
-        self.assertEqual(len(response.context['page_obj']), 0)
-        Follow.objects.create(user=self.user, author=self.post.author)
-        response2 = self.authorized_client.get(reverse('posts:follow_index'))
-        self.assertEqual(len(response2.context['page_obj']), 1)
-        self.assertIn(self.post, response2.context['page_obj'])
+        count = Follow.objects.count()
+        self.follower_client.get(reverse(
+            'posts:profile_follow',
+            kwargs={'username': self.follower})
+        )
+        follow = Follow.objects.all().latest('id')
+        self.assertEqual(Follow.objects.count(), count + 1)
+        self.assertEqual(follow.author_id, self.follower.id)
+        self.assertEqual(follow.user_id, self.following.id)
 
     def test_unfollow_author_page(self):
         """Тестирование отписки на автора."""
-        response = self.authorized_client.get(reverse('posts:follow_index'))
-        Follow.objects.all().delete()
-        self.assertEqual(len(response.context['page_obj']), 0)
+        post = Post.objects.create(
+            author=self.following,
+            text='Тестовый текст'
+        )
+        Follow.objects.create(
+            user=self.follower,
+            author=self.following
+        )
+        response = self.authorized_client.get(
+            reverse('posts:follow_index')
+        )
+        post_object = response.context['page_obj']
+        self.assertIn(post, post_object)
 
     def test_post_at_unfollow_page(self):
         """Тестирование появления поста у не подписчика."""
-        response = self.authorized_client.get(reverse('posts:follow_index'))
-        nonfollower = User.objects.create(username='Unknown')
-        self.authorized_client.force_login(nonfollower)
-        self.assertNotIn(self.post, response.context['page_obj'])
+        post = Post.objects.create(
+            author=self.following,
+            text='Тестовый текст'
+        )
+        response = self.authorized_client.get(
+            reverse('posts:follow_index')
+        )
+        post_object = response.context['page_obj']
+        self.assertNotIn(post, post_object)
 
 
 TEMP_MEDIA_ROOT = tempfile.mkdtemp(dir=settings.BASE_DIR)
@@ -242,20 +284,13 @@ class PostMediaTests(TestCase):
     def setUp(self):
         self.authorized_client = Client()
 
-    def test_add_image(self):
-        """Валидная форма создает запись с картинкой в Post."""
-        self.assertTrue(
-            Post.objects.filter(
-                text='Тестовый текст',
-                image='posts/small.gif'
-            ).exists()
-        )
-
     def test_image_in_index_page(self):
         """Изображение передаётся на главную страницу."""
-        response = self.authorized_client.get(reverse('posts:index'))
-        expected = response.context['page_obj'][0]
-        self.assertEqual(expected.image, self.post.image)
+        template = reverse('posts:index')
+        for url in template:
+            response = self.authorized_client.get(url)
+            expected = response.context['page_obj'][0]
+            self.assertEqual(expected.image, self.post.image)
 
     def test_image_in_profile_page(self):
         """Изображение передаётся на на страницу профайла."""

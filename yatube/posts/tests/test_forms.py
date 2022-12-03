@@ -1,9 +1,16 @@
+import shutil
+import tempfile
+
 from http import HTTPStatus
 
+from django.conf import settings
 from django.test import Client, TestCase
 from django.urls import reverse
 
 from posts.models import Comment, Group, Post, User
+
+
+TEMP_MEDIA_ROOT = tempfile.mkdtemp(dir=settings.BASE_DIR)
 
 
 class PostFormTests(TestCase):
@@ -26,6 +33,11 @@ class PostFormTests(TestCase):
             author=cls.user,
             text='Тестовый комментарий',
         )
+
+    @classmethod
+    def tearDownClass(cls):
+        super().tearDownClass()
+        shutil.rmtree(TEMP_MEDIA_ROOT, ignore_errors=True)
 
     def test_create_post(self):
         """Валидная форма создает запись в базе данных."""

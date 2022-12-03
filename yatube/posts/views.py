@@ -30,8 +30,7 @@ def profile(request, username):
     author = get_object_or_404(User, username=username)
     posts = author.posts.all()
     post_count = posts.count()
-    following = request.user.is_authenticated and request.user.follower.filter(
-        author=author)
+    following = request.user.is_authenticated and author.following.exists()
     context = {
         'author': author,
         'following': following,
