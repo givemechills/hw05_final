@@ -122,8 +122,6 @@ USE_L10N = True
 
 USE_TZ = True
 
-POSTS_PER_PAGE = 10
-
 STATIC_URL = '/static/'
 
 STATICFILES_DIRS = [
