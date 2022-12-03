@@ -1,5 +1,6 @@
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
+from django.core.paginator import Paginator
 from django.shortcuts import get_object_or_404, redirect, render
 
 from .forms import CommentForm, PostForm
@@ -7,37 +8,46 @@ from .models import Follow, Group, Post, User
 from .utils import get_page_context
 
 User = get_user_model()
+POSTS_PER_PAGE = 10
 
 
 def index(request):
     all_posts = Post.objects.all()
-    context = get_page_context(all_posts, request)
+    paginator = Paginator(all_posts, POSTS_PER_PAGE)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    context = {
+        'page_obj': page_obj,
+    }
     return render(request, 'posts/index.html', context)
 
 
 def group_posts(request, slug):
     group = get_object_or_404(Group, slug=slug)
     posts = group.posts.all()
+    paginator = Paginator(posts, POSTS_PER_PAGE)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
     context = {
         'group': group,
-        'posts': posts,
+        'page_obj': page_obj,
     }
-    context.update(get_page_context(group.posts.all(), request))
     return render(request, 'posts/group_list.html', context)
 
 
 def profile(request, username):
-    author_id = User.objects.get(username=username)
-    posts = author_id.posts.all()
-    post_count = posts.count()
-    following = request.user.is_authenticated and author_id.following.exists()
+    author = get_object_or_404(User, username=username)
+    posts = author.posts.all()
+    paginator = Paginator(posts, POSTS_PER_PAGE)
+    page_number = request.GET.get("page")
+    page_obj = paginator.get_page(page_number)
+    following = request.user.is_authenticated and author.following.exists()
     context = {
-        'author': author_id,
+        'author': author,
         'following': following,
         'posts': posts,
-        'posts_count': post_count
+        'page_obj': page_obj,
     }
-    context.update(get_page_context(author_id.posts.all(), request))
     return render(request, 'posts/profile.html', context)
 
 
