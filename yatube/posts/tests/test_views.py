@@ -276,14 +276,15 @@ class PostMediaTests(TestCase):
 
     def setUp(self):
         self.authorized_client = Client()
+        self.authorized_client.force_login(self.user)
 
-    def test_add_image(self, post):
-        """Проверка добавления картинки к посту."""
-        with self.subTest(post=post):
-            self.assertEqual(post.text, self.post.text)
-            self.assertEqual(post.group, self.post.group)
-            self.assertEqual(post.author, self.post.author)
-            self.assertEqual(post.image, self.post.image)
+    def test_image_exists(self):
+        """Проверка добавления картинки в базе данных."""
+        self.assertTrue(
+            Post.objects.filter(
+                text='Тестовый текст',
+                image='posts/small.gif').exists()
+        )
 
     def test_image_in_index_page(self):
         """Изображение передаётся на главную страницу."""
