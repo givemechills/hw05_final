@@ -43,7 +43,10 @@ def profile(request, username):
     paginator = Paginator(post_list, POSTS_PER_PAGE)
     page_number = request.GET.get("page")
     page_obj = paginator.get_page(page_number)
-    following = request.user.is_authenticated and author.following.exists()
+    following = request.user.is_authenticated and Follow.objects.filter(
+        user=request.user,
+        author=author,
+    ).exists
     context = {
         'author': author,
         'following': following,
@@ -78,7 +81,7 @@ def post_create(request):
         post = form.save(commit=False)
         post.author = request.user
         post.save()
-        return redirect('posts:profile', post.author)
+        return redirect('posts:profile', request.user)
     context = {
         'form': form,
         'is_edit': False,
@@ -96,10 +99,10 @@ def post_edit(request, post_id):
     )
     is_edit = True
     if request.user.id != post.author.id:
-        return redirect('posts:post_detail', post.pk)
+        return redirect('posts:post_detail', post.id)
     if form.is_valid():
         form.save()
-        return redirect('posts:post_detail', post_id)
+        return redirect('posts:post_detail', post.id)
     context = {
         'form': form,
         'is_edit': is_edit,

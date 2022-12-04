@@ -173,9 +173,8 @@ class PostPagesTests(TestCase):
         """Тестирование кеша."""
         response = self.authorized_client.get(reverse('posts:index'))
         post_1 = response.content
-        post_delete = Post.objects.get(id=1)
+        Post.objects.all().delete()
         response2 = self.authorized_client.get(reverse('posts:index'))
-        post_delete.delete()
         post_2 = response2.content
         self.assertEqual(post_1, post_2, 'Ошибка')
         cache.clear()
@@ -214,23 +213,17 @@ class FollowViewsTests(TestCase):
         self.assertEqual(follow.user_id, self.following.id)
 
     def test_unfollow_author_page(self):
-        """Тестирование отписки на автора."""
-        post = Post.objects.create(
-            author=self.following,
-            text='Тестовый текст'
-        )
-        Follow.objects.create(
-            user=self.follower,
-            author=self.following
-        )
-        response = self.authorized_client.get(
-            reverse('posts:follow_index')
-        )
-        post_object = response.context['page_obj']
-        self.assertIn(post, post_object)
+        """Тестирование отписки от автора."""
+        Follow.objects.create(user=self.following,
+                              author=self.follower)
+        follow_count = Follow.objects.count()
+        self.follower_client.post(
+            reverse('posts:profile_unfollow',
+                    kwargs={'username': self.follower}))
+        self.assertEqual(Follow.objects.count(), follow_count - 1)
 
     def test_post_at_unfollow_page(self):
-        """Тестирование появления поста у не подписчика."""
+        """Тестирование удаления поста."""
         post = Post.objects.create(
             author=self.following,
             text='Тестовый текст'
@@ -283,6 +276,14 @@ class PostMediaTests(TestCase):
 
     def setUp(self):
         self.authorized_client = Client()
+
+    def test_add_image(self, post):
+        """Проверка добавления картинки к посту."""
+        with self.subTest(post=post):
+            self.assertEqual(post.text, self.post.text)
+            self.assertEqual(post.group, self.post.group)
+            self.assertEqual(post.author, self.post.author)
+            self.assertEqual(post.image, self.post.image)
 
     def test_image_in_index_page(self):
         """Изображение передаётся на главную страницу."""
