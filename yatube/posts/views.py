@@ -12,7 +12,7 @@ POSTS_PER_PAGE = 10
 
 
 def index(request):
-    all_posts = Post.objects.all()
+    all_posts = Post.objects.select_related('author', 'group')
     paginator = Paginator(all_posts, POSTS_PER_PAGE)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
@@ -25,7 +25,7 @@ def index(request):
 
 def group_posts(request, slug):
     group = get_object_or_404(Group, slug=slug)
-    posts = group.posts.all()
+    posts = group.posts.select_related('author')
     paginator = Paginator(posts, POSTS_PER_PAGE)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
@@ -38,24 +38,27 @@ def group_posts(request, slug):
 
 def profile(request, username):
     author = get_object_or_404(User, username=username)
-    post_list = Post.objects.filter(author=author)
+    post_list = author.posts.select_related('group')
+    post_count = post_list.count()
     paginator = Paginator(post_list, POSTS_PER_PAGE)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
-    following = request.user.is_authenticated and Follow.objects.filter(
-        user=request.user,
-        author=author,
-    ).exists
+    following = (request.user.is_authenticated
+                 and request.user.follower.filter(author=author).exists())
     context = {
         'author': author,
         'following': following,
         'page_obj': page_obj,
+        'post_count': post_count,
     }
     return render(request, 'posts/profile.html', context)
 
 
 def post_detail(request, post_id):
-    post = get_object_or_404(Post, pk=post_id)
+    post = get_object_or_404(
+        Post.objects.select_related('group', 'author'),
+        id=post_id
+    )
     author = post.author
     form = CommentForm(request.POST or None)
     comments = post.comments.all()
@@ -91,7 +94,10 @@ def post_create(request):
 @login_required
 def post_edit(request, post_id):
     is_edit = True
-    post = get_object_or_404(Post, pk=post_id)
+    post = get_object_or_404(
+        Post.objects.select_related('group', 'author'),
+        id=post_id
+    )
     form = PostForm(
         request.POST or None,
         instance=post,
@@ -127,7 +133,9 @@ def follow_index(request):
     follower = Follow.objects.filter(user=request.user).values_list(
         'author_id', flat=True
     )
-    post_list = Post.objects.filter(author_id__in=follower)
+    post_list = Post.objects.select_related('author').filter(
+        author_id__in=follower
+    )
     paginator = Paginator(post_list, POSTS_PER_PAGE)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)

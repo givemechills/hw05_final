@@ -279,12 +279,28 @@ class PostMediaTests(TestCase):
         self.authorized_client.force_login(self.user)
 
     def test_image_exists(self):
-        """Проверка добавления картинки в базе данных."""
-        self.assertTrue(
-            Post.objects.filter(
-                text='Тестовый текст',
-                image='posts/small.gif').exists()
+        """Проверка создания поста с картинкой."""
+        posts_count = Post.objects.count()
+        uploaded_img = SimpleUploadedFile(
+            name='tiny.gif',
+            content=self.small_gif,
+            content_type='image/gif'
         )
+        form_data = {
+            'text': 'Тестовый текст',
+            'image': uploaded_img,
+        }
+        response = self.authorized_client.post(
+            reverse('posts:post_create'),
+            data=form_data,
+            follow=True
+        )
+        self.assertRedirects(response, reverse(
+            'posts:profile',
+            kwargs={'username': self.user})
+        )
+        self.assertEqual(Post.objects.count(), posts_count + 1)
+        self.assertTrue(Post.objects.filter(text=form_data['text']).exists())
 
     def test_image_in_index_page(self):
         """Изображение передаётся на главную страницу."""
