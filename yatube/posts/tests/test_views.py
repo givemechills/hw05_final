@@ -300,10 +300,7 @@ class PostMediaTests(TestCase):
             kwargs={'username': self.user})
         )
         self.assertEqual(Post.objects.count(), posts_count + 1)
-        self.assertTrue(Post.objects.filter(
-            text='Тестовый текст',
-            image='posts/tiny.gif'
-        ).exists())
+        self.assertTrue(self.post.text, form_data['image'])
 
     def test_image_in_index_page(self):
         """Изображение передаётся на главную страницу."""
